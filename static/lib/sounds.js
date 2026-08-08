@@ -54,7 +54,7 @@ require(['hooks', 'alerts'], function (hooks, alerts) {
             }
         });
 
-        // 2. טיפול בהודעות צ'אט נכנסות (צליל + התראה קופצת נקייה)
+        // 2. טיפול בהודעות צ'אט נכנסות (צליל + התראה כחולה ונקייה)
         socket.on('event:chats.receive', function (data) {
             if (data && app.user && parseInt(data.fromUid, 10) !== parseInt(app.user.uid, 10)) {
                 // השמעת צליל צ'אט נכנס
@@ -66,12 +66,13 @@ require(['hooks', 'alerts'], function (hooks, alerts) {
                 const fromUser = messageObj.fromUser || {};
                 const rawContent = messageObj.content || data.content || '';
                 const cleanText = stripHTML(rawContent);
+                const username = fromUser.username || 'משתמש';
 
-                // הצגת התראה קופצת נקייה ומעוצבת
+                // הצגת התראה קופצת כחולה ורגילה בדיוק כמו ההתראות הכלליות
                 alerts.alert({
-                    type: 'success',
-                    title: 'הודעה מ- ' + (fromUser.username || 'משתמש'),
-                    message: cleanText || 'הודעה חדשה בצ\'אט',
+                    type: 'info',
+                    title: '<span style="font-size: 0.825rem !important; font-weight: 600 !important; font-family: inherit !important;">התראה</span>',
+                    message: '<span style="font-size: 0.9rem !important; font-weight: 400 !important; font-family: inherit !important;">הודעה חדשה מ <strong style="font-weight: 600 !important;">' + username + '</strong>' + (cleanText ? ': ' + cleanText : '') + '</span>',
                     timeout: 5000,
                     clickfn: function () {
                         ajaxify.go('/chats/' + data.roomId);
