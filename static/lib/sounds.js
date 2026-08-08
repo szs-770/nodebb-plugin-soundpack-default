@@ -2,32 +2,29 @@
 
 /* globals config, app, socket, Audio, $, ajaxify */
 
-require(['hooks', 'alerts'], function (hooks, alerts) {
+require(['hooks'], function (hooks) {
+    const cache = {};
 
-    // פונקציה להשמעת צליל
     function playAudio(file) {
         if (!file) return;
         const soundUrl = config.relative_path + '/assets/plugins/nodebb-plugin-soundpack-default/sounds/' + file;
-        const audio = new Audio(soundUrl);
-        audio.play().catch(function (err) {
-            console.warn('[soundpack] Playback blocked:', err);
-        });
-    }
-
-    // פונקציה להצגת הודעת טוסט
-    function showToast(data) {
-        alerts.alert({
-            type: 'info',
-            title: data.title || 'התראה חדשה',
-            message: data.bodyShort || data.text || 'קיבלת עדכון חדש בפורום',
-            timeout: 5000, // יוצג ל-5 שניות
-            clickfn: function() {
-                if (data.path) ajaxify.go(data.path);
+        
+        try {
+            if (!cache[file]) {
+                cache[file] = new Audio(soundUrl);
             }
-        });
+            const audio = cache[file];
+            audio.pause();
+            audio.currentTime = 0;
+            audio.play().catch(function (err) {
+                console.warn('[soundpack] Playback error:', err);
+            });
+        } catch (err) {
+            console.warn('[soundpack] Audio error:', err);
+        }
     }
 
-    // מאזין לכפתורי בדיקת צליל בהגדרות
+    // מאזינים לכפתורי בדיקת צליל בהגדרות החשבון
     $(document).on('click', 'button[data-action="play"]', function (e) {
         e.preventDefault();
         const select = $(this).closest('.d-flex').find('select');
@@ -37,51 +34,24 @@ require(['hooks', 'alerts'], function (hooks, alerts) {
         }
     });
 
-    // הרצת מאזינים רק פעם אחת
     if (!window.soundpackInitialized) {
-        
-        // 1. טיפול בהתראות כלליות (לייקים, תיוגים, תגובות)
-        socket.on('event:new_notification', function (data) {
+        // 1. צליל התראה כללית (לייקים, תיוגים, תגובות)
+        socket.on('event:new_notification', function () {
             if (config.notificationSound) {
                 playAudio(config.notificationSound);
             }
-            // הצגת הטוסט
-            if (data) {
-                showToast({
-                    title: '[[global:notification]]',
-                    bodyShort: data.bodyShort,
-                    path: data.path
-                });
-            }
         });
 
-        // 2. טיפול בהודעות צ'אט נכנסות
+        // 2. צליל הודעת צ'אט נכנסת
         socket.on('event:chats.receive', function (data) {
-            if (app.user && parseInt(data.fromUid, 10) !== parseInt(app.user.uid, 10)) {
+            if (data && app.user && parseInt(data.fromUid, 10) !== parseInt(app.user.uid, 10)) {
                 if (config.incomingChatSound) {
                     playAudio(config.incomingChatSound);
                 }
-                
-                // מניעת הצגת התראה קופצת אם המשתמש כבר נמצא בצ'אט הפעיל
-                const isCurrentRoom = ajaxify.data && ajaxify.data.roomId && String(ajaxify.data.roomId) === String(data.roomId);
-                if (!isCurrentRoom) {
-                    const message = data.message || {};
-                    const fromUser = message.fromUser || {};
-                    // הצגת טוסט עבור צ'אט
-                    alerts.alert({
-                        type: 'success',
-                        title: 'הודעה מ- ' + (fromUser.username || 'משתמש'),
-                        message: message.content || '',
-                        timeout: 5000,
-                        clickfn: function() {
-                            ajaxify.go('/chats/' + data.roomId);
-                        }
-                    });
-                }
             }
         });
 
-        // 3. צליל בלבד לשליחת צ'אט (אין צורך בטוסט לעצמך)
+        // 3. צליל שליחת הודעת צ'אט
         hooks.on('action:chat.sent', function () {
             if (config.outgoingChatSound) {
                 playAudio(config.outgoingChatSound);
