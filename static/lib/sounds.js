@@ -24,16 +24,27 @@ require(['hooks', 'alerts'], function (hooks, alerts) {
         }
     }
 
-    // פונקציה לניקוי מוחלט של תגיות HTML מתוכן ההודעה (למניעת הצגת קוד HTML)
-    function stripHTML(html) {
-        if (!html) return '';
-        try {
-            const tmp = document.createElement('div');
-            tmp.innerHTML = html;
-            return tmp.textContent || tmp.innerText || html.replace(/<[^>]*>?/gm, '').trim();
-        } catch (e) {
-            return html.replace(/<[^>]*>?/gm, '').trim();
+    // בדיקה האם חלון הצ'אט עבור חדר זה פתוח כעת במסך (בין אם בדף מלא, בחלונית קטנה או גדולה)
+    function isChatOpen(roomId) {
+        if (!roomId) return false;
+        
+        // 1. בדיקה אם המשתמש בדף צ'אט מלא של אותו חדר
+        if (window.ajaxify && ajaxify.data && ajaxify.data.template) {
+            const template = ajaxify.data.template.name || ajaxify.data.template;
+            if ((template === 'chats' || template === 'chat') && String(ajaxify.data.roomId) === String(roomId)) {
+                return true;
+            }
         }
+        
+        // 2. בדיקה אם קיימת חלונית צ'אט (קטנה או גדולה) במסך עבור חדר זה
+        const chatModal = $('[data-room-id="' + roomId + '"]');
+        if (chatModal.length > 0) {
+            if (chatModal.is(':visible') || !chatModal.hasClass('hidden')) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     // מאזינים לכפתורי בדיקת צליל בהגדרות החשבון
@@ -47,37 +58,37 @@ require(['hooks', 'alerts'], function (hooks, alerts) {
     });
 
     if (!window.soundpackInitialized) {
-        // 1. צליל התראה כללית
+        // 1. צליל התראה כללית (לייקים, תיוגים, תגובות)
         socket.on('event:new_notification', function () {
             if (config.notificationSound) {
                 playAudio(config.notificationSound);
             }
         });
 
-        // 2. טיפול בהודעות צ'אט נכנסות (צליל + התראה כחולה ותקנית ל-NodeBB 4.x)
+        // 2. טיפול בהודעות צ'אט נכנסות
         socket.on('event:chats.receive', function (data) {
             if (data && app.user && parseInt(data.fromUid, 10) !== parseInt(app.user.uid, 10)) {
-                // השמעת צליל צ'אט נכנס
+                // השמעת צליל צ'אט נכנס בכל מקרה
                 if (config.incomingChatSound) {
                     playAudio(config.incomingChatSound);
                 }
 
-                const messageObj = data.message || {};
-                const fromUser = messageObj.fromUser || {};
-                const rawContent = messageObj.content || data.content || '';
-                const cleanText = stripHTML(rawContent);
-                const username = fromUser.username || 'משתמש';
+                // הצגת באנר ההתראה הכחול אך ורק אם הצ'אט אינו פתוח כעת במסך (בחלונית או בדף מלא)
+                if (!isChatOpen(data.roomId)) {
+                    const messageObj = data.message || {};
+                    const fromUser = messageObj.fromUser || {};
+                    const username = fromUser.username || 'משתמש';
 
-                // התראה כחולה תקנית של NodeBB 4.x (טקסט נקי בלבד ללא תגיות HTML)
-                alerts.alert({
-                    type: 'info',
-                    title: 'התראה',
-                    message: 'הודעה חדשה מ ' + username + (cleanText ? ': ' + cleanText : ''),
-                    timeout: 5000,
-                    clickfn: function () {
-                        ajaxify.go('/chats/' + data.roomId);
-                    }
-                });
+                    alerts.alert({
+                        type: 'info',
+                        title: 'הודעה חדשה',
+                        message: 'הודעה חדשה מ <strong>' + username + '</strong>',
+                        timeout: 5000,
+                        clickfn: function () {
+                            ajaxify.go('/chats/' + data.roomId);
+                        }
+                    });
+                }
             }
         });
 
