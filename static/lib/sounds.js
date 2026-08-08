@@ -2,7 +2,7 @@
 
 /* globals config, app, socket, Audio, $, ajaxify */
 
-require(['hooks'], function (hooks) {
+require(['hooks', 'alerts'], function (hooks, alerts) {
     const cache = {};
 
     function playAudio(file) {
@@ -24,6 +24,18 @@ require(['hooks'], function (hooks) {
         }
     }
 
+    // פונקציה לניקוי תגיות HTML מתוכן ההודעה (כדי למנוע הצגת תגיות כגון <p dir="auto">)
+    function stripHTML(html) {
+        if (!html) return '';
+        try {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            return tmp.textContent || tmp.innerText || html.replace(/<[^>]*>?/gm, '').trim();
+        } catch (e) {
+            return html.replace(/<[^>]*>?/gm, '').trim();
+        }
+    }
+
     // מאזינים לכפתורי בדיקת צליל בהגדרות החשבון
     $(document).on('click', 'button[data-action="play"]', function (e) {
         e.preventDefault();
@@ -35,19 +47,36 @@ require(['hooks'], function (hooks) {
     });
 
     if (!window.soundpackInitialized) {
-        // 1. צליל התראה כללית (לייקים, תיוגים, תגובות)
+        // 1. צליל התראה כללית
         socket.on('event:new_notification', function () {
             if (config.notificationSound) {
                 playAudio(config.notificationSound);
             }
         });
 
-        // 2. צליל הודעת צ'אט נכנסת
+        // 2. טיפול בהודעות צ'אט נכנסות (צליל + התראה קופצת נקייה)
         socket.on('event:chats.receive', function (data) {
             if (data && app.user && parseInt(data.fromUid, 10) !== parseInt(app.user.uid, 10)) {
+                // השמעת צליל צ'אט נכנס
                 if (config.incomingChatSound) {
                     playAudio(config.incomingChatSound);
                 }
+
+                const messageObj = data.message || {};
+                const fromUser = messageObj.fromUser || {};
+                const rawContent = messageObj.content || data.content || '';
+                const cleanText = stripHTML(rawContent);
+
+                // הצגת התראה קופצת נקייה ומעוצבת
+                alerts.alert({
+                    type: 'success',
+                    title: 'הודעה מ- ' + (fromUser.username || 'משתמש'),
+                    message: cleanText || 'הודעה חדשה בצ\'אט',
+                    timeout: 5000,
+                    clickfn: function () {
+                        ajaxify.go('/chats/' + data.roomId);
+                    }
+                });
             }
         });
 
