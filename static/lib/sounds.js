@@ -24,7 +24,7 @@ require(['hooks', 'alerts'], function (hooks, alerts) {
         }
     }
 
-    // פונקציה לניקוי תגיות HTML מתוכן ההודעה (כדי למנוע הצגת תגיות כגון <p dir="auto">)
+    // פונקציה לניקוי מוחלט של תגיות HTML מתוכן ההודעה (למניעת הצגת קוד HTML)
     function stripHTML(html) {
         if (!html) return '';
         try {
@@ -54,7 +54,7 @@ require(['hooks', 'alerts'], function (hooks, alerts) {
             }
         });
 
-        // 2. טיפול בהודעות צ'אט נכנסות (צליל + התראה כחולה ונקייה)
+        // 2. טיפול בהודעות צ'אט נכנסות (צליל + התראה כחולה ותקנית ל-NodeBB 4.x)
         socket.on('event:chats.receive', function (data) {
             if (data && app.user && parseInt(data.fromUid, 10) !== parseInt(app.user.uid, 10)) {
                 // השמעת צליל צ'אט נכנס
@@ -68,11 +68,11 @@ require(['hooks', 'alerts'], function (hooks, alerts) {
                 const cleanText = stripHTML(rawContent);
                 const username = fromUser.username || 'משתמש';
 
-                // הצגת התראה קופצת כחולה ורגילה בדיוק כמו ההתראות הכלליות
+                // התראה כחולה תקנית של NodeBB 4.x (טקסט נקי בלבד ללא תגיות HTML)
                 alerts.alert({
                     type: 'info',
-                    title: '<span style="font-size: 0.825rem !important; font-weight: 600 !important; font-family: inherit !important;">התראה</span>',
-                    message: '<span style="font-size: 0.9rem !important; font-weight: 400 !important; font-family: inherit !important;">הודעה חדשה מ <strong style="font-weight: 600 !important;">' + username + '</strong>' + (cleanText ? ': ' + cleanText : '') + '</span>',
+                    title: 'התראה',
+                    message: 'הודעה חדשה מ ' + username + (cleanText ? ': ' + cleanText : ''),
                     timeout: 5000,
                     clickfn: function () {
                         ajaxify.go('/chats/' + data.roomId);
